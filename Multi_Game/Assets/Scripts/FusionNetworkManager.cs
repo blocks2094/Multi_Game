@@ -28,6 +28,13 @@ public sealed class FusionNetworkManager : MonoBehaviour
     private string lobbyScenePath =
         "Assets/Scenes/Lobby.unity";
 
+    [Header("Player Settings")]
+    [Tooltip(
+    "LobbyScene에서 생성할 플레이어 NetworkObject 프리팹입니다."
+)]
+    [SerializeField]
+    private NetworkObject lobbyPlayerPrefab;
+
     private GameObject _runnerObject;
     private NetworkSceneManagerDefault _networkSceneManager;
 
@@ -36,6 +43,15 @@ public sealed class FusionNetworkManager : MonoBehaviour
     /// 아직 연결하지 않았다면 null입니다.
     /// </summary>
     public NetworkRunner Runner { get; private set; }
+
+    /// <summary>
+    /// 플레이어 생성과 제거를 담당하는 Spawner입니다.
+    /// </summary>
+    public FusionPlayerSpawner PlayerSpawner
+    {
+        get;
+        private set;
+    }
 
     /// <summary>
     /// 현재 방 코드입니다.
@@ -222,6 +238,18 @@ public sealed class FusionNetworkManager : MonoBehaviour
                 return;
             }
 
+            if (lobbyPlayerPrefab == null)
+            {
+                CurrentRoomCode = string.Empty;
+
+                ReportFailure(
+                    "Lobby Player Prefab이 연결되지 않았습니다. " +
+                    "FusionNetworkManager Inspector를 확인하세요."
+                );
+
+                return;
+            }
+
             CreateRunner();
 
             StartGameArgs startGameArgs =
@@ -324,7 +352,7 @@ public sealed class FusionNetworkManager : MonoBehaviour
     private void CreateRunner()
     {
         if (Runner != null ||
-            _runnerObject != null)
+        _runnerObject != null)
         {
             throw new InvalidOperationException(
                 "NetworkRunner가 이미 생성되어 있습니다."
@@ -334,8 +362,13 @@ public sealed class FusionNetworkManager : MonoBehaviour
         _runnerObject =
             new GameObject("Fusion NetworkRunner");
 
-        // FusionNetworkManager의 자식으로 두면
-        // DontDestroyOnLoad 상태를 함께 유지합니다.
+        /*
+         * 모든 Fusion 컴포넌트를 먼저 추가한 다음 활성화합니다.
+         * Runner 초기화 시점에 FusionPlayerSpawner가
+         * 확실히 존재하도록 만들기 위한 처리입니다.
+         */
+        _runnerObject.SetActive(false);
+
         _runnerObject.transform.SetParent(
             transform,
             false
@@ -348,9 +381,18 @@ public sealed class FusionNetworkManager : MonoBehaviour
             _runnerObject.AddComponent
                 <NetworkSceneManagerDefault>();
 
-        // 아직 플레이어 이동 입력 시스템이 없으므로 false
-        // 나중에 캐릭터 이동을 추가할 때 true로 변경합니다.
+        PlayerSpawner =
+            _runnerObject.AddComponent
+                <FusionPlayerSpawner>();
+
+        PlayerSpawner.Initialize(
+            lobbyPlayerPrefab,
+            maxPlayers
+        );
+
         Runner.ProvideInput = false;
+
+        _runnerObject.SetActive(true);
     }
 
     /// <summary>
@@ -364,6 +406,7 @@ public sealed class FusionNetworkManager : MonoBehaviour
         Runner = null;
         _runnerObject = null;
         _networkSceneManager = null;
+        PlayerSpawner = null;
 
         if (runnerToCleanup != null &&
             !runnerToCleanup.IsShutdown)
