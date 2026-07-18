@@ -8,6 +8,11 @@ public class ObjectOutline : MonoBehaviour
     [SerializeField, Min(0.001f)] private float lineWidth = 0.015f;
     [SerializeField, Min(0f)] private float outlinePadding = 0.005f;
 
+    [Header("표시 설정")]
+    [SerializeField] private bool alwaysVisible;
+    [SerializeField] private bool hideSurface;
+
+    private MeshRenderer[] surfaceRenderers;
     private readonly LineRenderer[] outlineLines = new LineRenderer[12];
 
     private static readonly int[,] EdgeIndices =
@@ -22,20 +27,33 @@ public class ObjectOutline : MonoBehaviour
     private void Awake()
     {
         boxCollider = GetComponent<BoxCollider>();
+        surfaceRenderers = GetComponentsInChildren<MeshRenderer>(true);
 
         CreateOutlineLines();
         UpdateOutlinePositions();
+
+        SetSurfaceVisible(!hideSurface);
         SetVisible(false);
     }
 
     public void SetVisible(bool isVisible)
     {
+        bool shouldShow = alwaysVisible || isVisible;
+
         foreach (LineRenderer outlineLine in outlineLines)
         {
             if (outlineLine != null)
             {
-                outlineLine.enabled = isVisible;
+                outlineLine.enabled = shouldShow;
             }
+        }
+    }
+
+    private void SetSurfaceVisible(bool isVisible)
+    {
+        foreach (MeshRenderer surfaceRenderer in surfaceRenderers)
+        {
+            surfaceRenderer.enabled = isVisible;
         }
     }
 
